@@ -1,4 +1,7 @@
 #include "stack.h"
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -7,15 +10,15 @@
 Stack::Stack(int initCap)
 {
     this->top = 0;
-    this->cap = initCap;
+    this->cap = initCap != 0 ? initCap : STACK_GROWTH_FACTOR;
 
-    int* newItems = (int*)malloc(cap * sizeof(int));
-    if (newItems == NULL) {
+    int* newPtr = (int*)malloc(cap * sizeof(int));
+    if (newPtr == NULL) {
         errno = ENOMEM;
         return;
     }
 
-    this->items = newItems;
+    this->items = newPtr;
 }
 
 Stack::~Stack()
@@ -24,6 +27,72 @@ Stack::~Stack()
     this->items = NULL;
     this->top = 0;
     this->cap = 0;
+}
+
+Stack::Stack(const Stack& other)
+{
+    try {
+        this->top = other.top;
+
+        if (this->top > 0) {
+            int* newPtr = (int*)malloc(this->top * sizeof(int));
+            if (newPtr == NULL) {
+                throw ENOMEM;
+            }
+
+            this->cap = this->top;
+            memcpy(newPtr, other.items, other.top * sizeof(int));
+
+        } else {
+            int* newPtr = (int*)malloc(STACK_GROWTH_FACTOR * sizeof(int));
+            if (newPtr == NULL) {
+                throw ENOMEM;
+            }
+
+            this->cap = STACK_GROWTH_FACTOR;
+            this->items = newPtr;
+        }
+    } catch (...) {
+        this->top = 0;
+        this->cap = 0;
+        if (this->items == NULL) {
+            free(this->items);
+        }
+        this->items = NULL;
+        errno = ENOMEM;
+    }
+}
+
+Stack& Stack::operator=(const Stack& other)
+{
+    if (other.top == 0) {
+        this->top = 0;
+    }
+
+    this->top = other.top;
+
+    if (this->cap >= other.top) {
+        memcpy(other.items, this->items, other.top * sizeof(int));
+        return *this;
+    }
+
+
+    try {
+        this->cap = other.top;
+        int* newPtr = (int*)malloc(other.top * sizeof(int));
+        if (newPtr == NULL) {
+            throw ENOMEM;
+        }
+    } catch (...) {
+        this->top = 0;
+        this->cap = 0;
+        if (this->items == NULL) {
+            free(this->items);
+        }
+        this->items = NULL;
+        errno = ENOMEM;
+    }
+    return *this;
 }
 
 void Stack::push(int element)
