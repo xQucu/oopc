@@ -40,6 +40,7 @@ Stack::Stack(const Stack& other)
                 throw ENOMEM;
             }
 
+            this->items = newPtr;
             this->cap = this->top;
             memcpy(newPtr, other.items, other.top * sizeof(int));
 
@@ -49,13 +50,14 @@ Stack::Stack(const Stack& other)
                 throw ENOMEM;
             }
 
+
             this->cap = STACK_GROWTH_FACTOR;
             this->items = newPtr;
         }
     } catch (...) {
         this->top = 0;
         this->cap = 0;
-        if (this->items == NULL) {
+        if (this->items != NULL) {
             free(this->items);
         }
         this->items = NULL;
@@ -65,14 +67,10 @@ Stack::Stack(const Stack& other)
 
 Stack& Stack::operator=(const Stack& other)
 {
-    if (other.top == 0) {
-        this->top = 0;
-    }
-
     this->top = other.top;
 
     if (this->cap >= other.top) {
-        memcpy(other.items, this->items, other.top * sizeof(int));
+        memcpy(this->items, other.items, other.top * sizeof(int));
         return *this;
     }
 
@@ -83,10 +81,16 @@ Stack& Stack::operator=(const Stack& other)
         if (newPtr == NULL) {
             throw ENOMEM;
         }
+        if (this->items != NULL) {
+            free(this->items);
+            this->items = NULL;
+        }
+        this->items = newPtr;
+        memcpy(this->items, other.items, other.top * sizeof(int));
     } catch (...) {
         this->top = 0;
         this->cap = 0;
-        if (this->items == NULL) {
+        if (this->items != NULL) {
             free(this->items);
         }
         this->items = NULL;

@@ -11,6 +11,8 @@ void stackCapGrowthTest(int numberOfElements);
 void testCopy();
 void testAssignment();
 void testPassingObject();
+void testPassByVal(Stack s);
+void testPassByRef(Stack& s);
 
 int main()
 {
@@ -18,10 +20,40 @@ int main()
     testIsEmpty();
     testPopErrorCases();
 
+
+    testCopy();
+    testAssignment();
+    testPassingObject();
+
     int numberOfElements = 10000;
     stackCapGrowthTest(numberOfElements);
 
     return 0;
+}
+
+void testPassByVal(Stack s)
+{
+    s.pop();
+}
+
+void testPassByRef(Stack& s)
+{
+    s.pop();
+}
+
+void testPassingObject()
+{
+    Stack s1(3);
+    s1.push(1);
+    s1.push(2);
+    s1.push(3);
+
+    testPassByVal(s1);
+    assert(s1.pop() == 3);
+
+    testPassByRef(s1);
+    assert(s1.pop() == 1);
+    assert(s1.isEmpty());
 }
 
 void testCopy()
@@ -35,7 +67,7 @@ void testCopy()
 
     assert(s1.pop() == s2.pop());
     s2.push(4);
-    assert(s1.pop() == 3);
+    assert(s1.pop() == 2);
     assert(s2.pop() == 4);
 
     Stack s3(0);
@@ -67,7 +99,7 @@ void testAssignment()
     s2.pop();
 
     s1 = s2;
-    assert(s1.pop() == s2.pop());
+    assert(s1.isEmpty() && s2.isEmpty());
 
     s1.push(5);
     s1.push(8);
