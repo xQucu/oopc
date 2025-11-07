@@ -10,6 +10,6 @@ testcomplex.o: testcomplex.cpp complex.h
 .PHONY: clean
 
 clean:
-	-rm complex.o test*.o test*
+	-rm complex.o test*.o
 run:
 	clear && $(MAKE) && valgrind --leak-check=full ./test*
