@@ -90,20 +90,16 @@ std::ostream& operator<<(std::ostream& output, const Poly& poly)
             } else {
                 output << " - ";
             }
+        }
 
-            if (it->second != 1) {
-                output << std::abs(it->second);
-            }
-        } else {
-
-            if (it->second != 1) {
-                output << it->second;
-            }
+        if (std::abs(it->second) != 1) {
+            output << std::abs(it->second);
         }
 
         if (it->first != 0 && it->first != 1) {
             output << "x^" << it->first;
         }
+
         if (it->first == 1) {
             output << "x";
         }
