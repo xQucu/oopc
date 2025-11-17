@@ -14,6 +14,8 @@ public:
     void addValuesFromPoly(const Poly& p1);
     friend Poly operator-(const Poly& p1, const Poly& p2);
     void substractValuesFromPoly(const Poly& p);
+    friend Poly operator*(const Poly& p1, const Poly& p2);
+    double operator()(double val) const;
 
 private:
     std::map<int, double> values;

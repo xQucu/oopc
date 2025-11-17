@@ -19,26 +19,26 @@ int main()
     Poly p1;
 
     // Specify coefficients of p1 = -2.3x^3 + 5x^2 - 4.5
-    // p1[3] = -2.3;
-    // p1[2] = 5;
-    // p1[0] = -4.5;
-    //
-    // cout << "======= Polynomial p1 =======" << endl;
-    // cout << p1 << endl;
-    //
-    // // Declare object representing polynomial p2 = 2.6
-    // Poly p2 = 2.6;
-    //
-    // // Specify additional coefficient of p2 = x^4 - 7x^2 + 3x + 2.6
-    // p2[1] = 3;
-    // p2[2] = -7;
-    // p2[4] = 1;
-    //
-    // cout << "\n======= Polynomial p2 =======" << endl;
-    // display(p2);
-    // display<const Poly>(p2);
-    //
-    // test(p1, p2);
+    p1[3] = -2.3;
+    p1[2] = 5;
+    p1[0] = -4.5;
+
+    cout << "======= Polynomial p1 =======" << endl;
+    cout << p1 << endl;
+
+    // Declare object representing polynomial p2 = 2.6
+    Poly p2 = 2.6;
+
+    // Specify additional coefficient of p2 = x^4 - 7x^2 + 3x + 2.6
+    p2[1] = 3;
+    p2[2] = -7;
+    p2[4] = 1;
+
+    cout << "\n======= Polynomial p2 =======" << endl;
+    display(p2);
+    display<const Poly>(p2);
+
+    test(p1, p2);
 }
 
 template <typename T>

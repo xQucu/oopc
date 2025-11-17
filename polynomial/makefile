@@ -1,11 +1,11 @@
 
-testPoly: testPoly.o poly.o
+testPolyWithFunctionTemplate: testPolyWithFunctionTemplate.o poly.o
 	g++ -g $^ -o $@
 
 poly.o: poly.cpp poly.h
 	g++ -c -g -Wall -pedantic $< -o $@
 
-testPoly.o: testPoly.cpp poly.h
+testPolyWithFunctionTemplate.o: testPolyWithFunctionTemplate.cpp poly.h
 	g++ -c -g -Wall -pedantic $< -o $@
 
 .PHONY: clean
@@ -13,4 +13,4 @@ testPoly.o: testPoly.cpp poly.h
 clean:
 	-rm poly.o test*.o
 run:
-	clear && $(MAKE) && valgrind --leak-check=full ./test*
+	clear && $(MAKE) && valgrind --leak-check=full ./testPolyW*
