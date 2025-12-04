@@ -1,6 +1,6 @@
 #include "matrix.h"
+#include <cstring>
 
-// Matrix constructors
 Matrix::Matrix(int r, int c)
     : rows(r)
     , cols(c)
@@ -8,18 +8,15 @@ Matrix::Matrix(int r, int c)
     , refCount(0)
 {
     if (r <= 0 || c <= 0) {
-        throw InvalidDimensionException("Matrix dimensions must be positive");
+        throw DimensionMismatchException("Matrix dimensions must be positive");
     }
 
     refCount = new int(1);
 
-    // Allocate memory: array of pointers to rows
     data = new int*[rows];
 
-    // Allocate memory for all elements in one block
     int* block = new int[rows * cols];
 
-    // Set up row pointers and initialize to zero
     for (int i = 0; i < rows; ++i) {
         data[i] = block + i * cols;
         for (int j = 0; j < cols; ++j) {
@@ -34,7 +31,6 @@ Matrix::Matrix(const Matrix& other)
     , cols(other.cols)
     , refCount(other.refCount)
 {
-    // Increment reference count
     (*refCount)++;
 }
 
@@ -50,27 +46,23 @@ Matrix::Matrix(std::istream& input)
     }
 
     if (r <= 0 || c <= 0) {
-        throw InvalidDimensionException("Matrix dimensions must be positive");
+        throw DimensionMismatchException("Matrix dimensions must be positive");
     }
 
     rows = r;
     cols = c;
     refCount = new int(1);
 
-    // Allocate memory
     data = new int*[rows];
     int* block = new int[rows * cols];
 
-    // Set up row pointers
     for (int i = 0; i < rows; ++i) {
         data[i] = block + i * cols;
     }
 
-    // Read elements
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
             if (!(input >> data[i][j])) {
-                // Clean up on failure
                 delete[] data[0];
                 delete[] data;
                 delete refCount;
@@ -86,8 +78,8 @@ Matrix::~Matrix()
         (*refCount)--;
         if (*refCount == 0) {
             if (data) {
-                delete[] data[0]; // Delete the data block
-                delete[] data; // Delete the row pointers array
+                delete[] data[0];
+                delete[] data;
             }
             delete refCount;
         }
@@ -97,7 +89,6 @@ Matrix::~Matrix()
 Matrix& Matrix::operator=(const Matrix& other)
 {
     if (this != &other) {
-        // Decrease old reference count
         if (refCount) {
             (*refCount)--;
             if (*refCount == 0) {
@@ -109,7 +100,6 @@ Matrix& Matrix::operator=(const Matrix& other)
             }
         }
 
-        // Share data with other
         data = other.data;
         rows = other.rows;
         cols = other.cols;
@@ -122,36 +112,25 @@ Matrix& Matrix::operator=(const Matrix& other)
 void Matrix::detach()
 {
     if (*refCount > 1) {
-        // Save old data
         int** oldData = data;
         int oldRows = rows;
         int oldCols = cols;
 
-        // Allocate new memory
         data = new int*[rows];
         int* block = new int[rows * cols];
 
-        // Set up row pointers
         for (int i = 0; i < rows; ++i) {
             data[i] = block + i * cols;
         }
 
-        // Copy all elements
-        for (int i = 0; i < rows; ++i) {
-            for (int j = 0; j < cols; ++j) {
-                data[i][j] = oldData[i][j];
-            }
-        }
+        memcpy(data[0], oldData[0], rows * cols * sizeof(int));
 
-        // Decrease old reference count
         (*refCount)--;
 
-        // Create new reference count
         refCount = new int(1);
     }
 }
 
-// Element access - const version (read-only)
 int Matrix::operator()(int row, int col) const
 {
     if (row < 0 || row >= rows || col < 0 || col >= cols) {
@@ -160,7 +139,6 @@ int Matrix::operator()(int row, int col) const
     return data[row][col];
 }
 
-// Element access - non-const version
 MatrixProxy Matrix::operator()(int row, int col)
 {
     if (row < 0 || row >= rows || col < 0 || col >= cols) {
@@ -169,21 +147,18 @@ MatrixProxy Matrix::operator()(int row, int col)
     return MatrixProxy(*this, row, col);
 }
 
-// MatrixProxy implementation
 MatrixProxy& MatrixProxy::operator=(int value)
 {
-    matrix.detach(); // Copy-on-write: detach only when writing
+    matrix.detach();
     matrix.data[row][col] = value;
     return *this;
 }
 
 MatrixProxy::operator int() const
 {
-    // Read operation - no detachment needed
     return matrix.data[row][col];
 }
 
-// Arithmetic operators
 Matrix Matrix::operator+(const Matrix& other) const
 {
     if (rows != other.rows || cols != other.cols) {
@@ -239,7 +214,7 @@ Matrix& Matrix::operator+=(const Matrix& other)
         throw DimensionMismatchException("Matrix dimensions must match for addition");
     }
 
-    detach(); // Ensure we have our own copy
+    detach();
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
             data[i][j] += other.data[i][j];
@@ -254,7 +229,7 @@ Matrix& Matrix::operator-=(const Matrix& other)
         throw DimensionMismatchException("Matrix dimensions must match for subtraction");
     }
 
-    detach(); // Ensure we have our own copy
+    detach();
     for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
             data[i][j] -= other.data[i][j];
@@ -269,7 +244,6 @@ Matrix& Matrix::operator*=(const Matrix& other)
     return *this;
 }
 
-// Comparison operators
 bool Matrix::operator==(const Matrix& other) const
 {
     if (rows != other.rows || cols != other.cols) {
@@ -291,7 +265,6 @@ bool Matrix::operator!=(const Matrix& other) const
     return !(*this == other);
 }
 
-// Stream insertion operator
 std::ostream& operator<<(std::ostream& os, const Matrix& matrix)
 {
     for (int i = 0; i < matrix.rows; ++i) {
