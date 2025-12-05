@@ -2,9 +2,9 @@
 #include <cstring>
 
 Matrix::Matrix(int r, int c)
-    : rows(r)
+    : data(0)
+    , rows(r)
     , cols(c)
-    , data(0)
     , refCount(0)
 {
     if (r <= 0 || c <= 0) {
@@ -113,8 +113,6 @@ void Matrix::detach()
 {
     if (*refCount > 1) {
         int** oldData = data;
-        int oldRows = rows;
-        int oldCols = cols;
 
         data = new int*[rows];
         int* block = new int[rows * cols];
