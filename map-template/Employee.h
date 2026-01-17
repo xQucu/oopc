@@ -13,12 +13,10 @@ public:
     std::string name;
     std::string position;
     int age;
-
-    friend std::ostream& operator<<(std::ostream& os, const Employee& emp)
-    {
-        os << emp.name << ", " << emp.position << ", " << emp.age;
-        return os;
-    }
-
-private:
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Employee& emp)
+{
+    os << emp.name << ", " << emp.position << ", " << emp.age;
+    return os;
+}

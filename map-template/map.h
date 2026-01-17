@@ -95,11 +95,6 @@ public:
         size = 0;
     }
 
-    int getSize() const
-    {
-        return size;
-    }
-
     Node<Key, Value>* getHead() const
     {
         return head;

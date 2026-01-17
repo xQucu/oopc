@@ -15,13 +15,13 @@ public:
     std::string category;
     int pages;
     std::string status;
-
-    friend std::ostream& operator<<(std::ostream& os, const Book& book)
-    {
-        os << "Author: " << book.author
-           << ", Category: " << book.category
-           << ", Pages: " << book.pages
-           << ", Status: " << book.status;
-        return os;
-    }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Book& book)
+{
+    os << "Author: " << book.author
+       << ", Category: " << book.category
+       << ", Pages: " << book.pages
+       << ", Status: " << book.status;
+    return os;
+}
