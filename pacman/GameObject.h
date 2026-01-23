@@ -22,8 +22,6 @@ public:
     void setPosition(const QPointF& pos);
     int getGridX() const;
     int getGridY() const;
-    int getTargetGridX() const;
-    int getTargetGridY() const;
     bool isAtTarget() const;
     void moveTowardsTarget();
 };

@@ -7,7 +7,6 @@
 #include <QString>
 #include <QVector>
 
-int selectPreferredDirection(int dx, int dy);
 int getOppositeDirection(int direction);
 
 class Enemy : public GameObject {
@@ -26,11 +25,7 @@ public:
     void setDirection(int d);
     int getDesiredDirection() const;
     void setDesiredDirection(int d);
-    int getMoveCounter() const;
     void incrementMoveCounter();
-    void resetMoveCounter();
-    int getGhostGridX() const;
-    int getGhostGridY() const;
     void draw(QPainter& painter) override;
     virtual void updateDirection(const Player& player, const QVector<QString>& map) = 0;
     void update() override;

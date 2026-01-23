@@ -25,10 +25,6 @@ int GameObject::getGridX() const { return qRound(position.x() / cellSize); }
 
 int GameObject::getGridY() const { return qRound(position.y() / cellSize); }
 
-int GameObject::getTargetGridX() const { return qRound(targetPosition.x() / cellSize); }
-
-int GameObject::getTargetGridY() const { return qRound(targetPosition.y() / cellSize); }
-
 bool GameObject::isAtTarget() const
 {
     float dx = targetPosition.x() - position.x();

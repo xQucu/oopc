@@ -2,23 +2,6 @@
 #include <QRandomGenerator>
 #include <QtMath>
 
-int selectPreferredDirection(int dx, int dy)
-{
-    if (abs(dx) > abs(dy)) {
-        return (dx > 0) ? 0 : 2;
-    } else if (abs(dy) > abs(dx)) {
-        return (dy > 0) ? 1 : 3;
-    } else {
-        if (dx > 0)
-            return 0;
-        if (dy > 0)
-            return 1;
-        if (dx < 0)
-            return 2;
-        return 3;
-    }
-}
-
 int getOppositeDirection(int direction)
 {
     return (direction + 2) % 4;
@@ -46,15 +29,7 @@ int Enemy::getDesiredDirection() const { return desiredDirection; }
 
 void Enemy::setDesiredDirection(int d) { desiredDirection = d; }
 
-int Enemy::getMoveCounter() const { return moveCounter; }
-
 void Enemy::incrementMoveCounter() { moveCounter++; }
-
-void Enemy::resetMoveCounter() { moveCounter = 0; }
-
-int Enemy::getGhostGridX() const { return qRound(position.x() / cellSize); }
-
-int Enemy::getGhostGridY() const { return qRound(position.y() / cellSize); }
 
 void Enemy::draw(QPainter& painter)
 {
@@ -371,7 +346,6 @@ void Enemy::reset()
     targetPosition = startPosition;
     setDirection(QRandomGenerator::global()->bounded(4));
     setFrightened(false);
-    resetMoveCounter();
 }
 
 bool Enemy::collidesWith(const Player& player) const
