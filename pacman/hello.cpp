@@ -10,6 +10,14 @@
 #include <QWidget>
 #include <QtMath>
 
+// TODO
+//  reset lives and score when lives =-1
+//  base-walkable doors
+//  ghosts starting at base
+//  ghosts scatter mode
+//  ghosts frighten mode improvements
+//  ghosts eaten mode
+
 // ============================================================================
 // GameObject - Base class
 // ============================================================================
@@ -94,6 +102,7 @@ private:
     int powerTimer;
     int score;
     int lives;
+    int mouthAngle; // For animation
 
 public:
     Player(const QPointF& pos, int size)
@@ -104,6 +113,7 @@ public:
         , powerTimer(0)
         , score(0)
         , lives(3)
+        , mouthAngle(0)
     {
         speed = 2.5f;
     }
@@ -121,8 +131,32 @@ public:
         painter.setPen(Qt::NoPen);
 
         int margin = cellSize / 6;
-        painter.drawEllipse(position.x() + margin, position.y() + margin,
-            cellSize - 2 * margin, cellSize - 2 * margin);
+
+        // Animate mouth: opens and closes (0-20 degrees)
+        int mouthDegrees = (mouthAngle % 10) * 2;
+
+        // Get starting angle based on direction Pac-Man is facing
+        // SWITCHED: 0=right(0°), 1=up(90°), 2=left(180°), 3=down(270°)
+        int startAngle = -mouthDegrees;
+        switch (direction) {
+        case 0: // Right
+            startAngle = 0;
+            break;
+        case 1: // Up (switched from down)
+            startAngle = 270;
+            break;
+        case 2: // Left
+            startAngle = 180;
+            break;
+        case 3: // Down (switched from up)
+            startAngle = 90;
+            break;
+        }
+
+        // Draw Pac-Man with mouth opening in direction of movement
+        painter.drawPie(QRectF(position.x() + margin, position.y() + margin,
+                              cellSize - 2 * margin, cellSize - 2 * margin),
+                       startAngle * 16, (360 - mouthDegrees) * 16);
 
         painter.restore();
     }
@@ -135,6 +169,9 @@ public:
                 powered = false;
             }
         }
+
+        // Animate mouth
+        mouthAngle = (mouthAngle + 2) % 15;
 
         moveTowardsTarget();
     }
@@ -166,7 +203,34 @@ public:
         if (gridY < 0 || gridY >= map.size())
             return false;
         QChar cell = map[gridY][gridX];
-        return cell != '#' && cell != '=';
+        return cell != '#';
+    }
+
+    int countAvailableDirections(const QVector<QString>& map)
+    {
+        // Count how many directions are passable from current position
+        // This helps detect intersections (3+ directions available)
+        int currentX = getGridX();
+        int currentY = getGridY();
+        int count = 0;
+
+        // Check all 4 directions
+        // Right
+        if (canMove(currentX + 1, currentY, map)) count++;
+        // Down
+        if (canMove(currentX, currentY + 1, map)) count++;
+        // Left
+        if (canMove(currentX - 1, currentY, map)) count++;
+        // Up
+        if (canMove(currentX, currentY - 1, map)) count++;
+
+        return count;
+    }
+
+    bool isAtIntersection(const QVector<QString>& map)
+    {
+        // An intersection is where 3 or more directions are available
+        return countAvailableDirections(map) >= 3;
     }
 
     void move(const QVector<QString>& map, int)
@@ -177,11 +241,36 @@ public:
 
         int currentX = getGridX();
         int currentY = getGridY();
+        int directionToUse = direction;
+
+        // Only allow direction changes at intersections (3+ available paths)
+        // At non-intersections, continue in current direction
+        if (isAtIntersection(map)) {
+            // At an intersection, try to apply the desired direction
+            int testX = currentX;
+            int testY = currentY;
+
+            switch (nextDirection) {
+            case 0: testX++; break;
+            case 1: testY++; break;
+            case 2: testX--; break;
+            case 3: testY--; break;
+            }
+
+            // If desired direction is valid, use it
+            if (canMove(testX, testY, map)) {
+                directionToUse = nextDirection;
+                direction = nextDirection;
+            }
+            // Otherwise, continue in current direction
+        }
+        // At non-intersections, continue in current direction (directionToUse stays as direction)
+
+        // Move in the determined direction
         int nextX = currentX;
         int nextY = currentY;
 
-        // Try to change direction
-        switch (nextDirection) {
+        switch (directionToUse) {
         case 0:
             nextX++;
             break;
@@ -194,28 +283,6 @@ public:
         case 3:
             nextY--;
             break;
-        }
-
-        if (canMove(nextX, nextY, map)) {
-            direction = nextDirection;
-        } else {
-            // Continue in current direction
-            nextX = currentX;
-            nextY = currentY;
-            switch (direction) {
-            case 0:
-                nextX++;
-                break;
-            case 1:
-                nextY++;
-                break;
-            case 2:
-                nextX--;
-                break;
-            case 3:
-                nextY--;
-                break;
-            }
         }
 
         if (canMove(nextX, nextY, map)) {
@@ -261,29 +328,77 @@ public:
         targetPosition = position;
         direction = 0;
         nextDirection = 0;
+        mouthAngle = 0;
     }
 };
+
+// ============================================================================
+// Helper function for ghost direction selection
+// ============================================================================
+// When ghosts have equal distance in x and y directions, prefer: up, right, down, left
+int selectPreferredDirection(int dx, int dy)
+{
+    if (abs(dx) > abs(dy)) {
+        return (dx > 0) ? 0 : 2;  // right or left
+    } else if (abs(dy) > abs(dx)) {
+        return (dy > 0) ? 1 : 3;  // down or up
+    } else {  // tie: abs(dx) == abs(dy)
+        // Prefer in order: right (0), down (1), left (2), up (3)
+        if (dx > 0) return 0;      // right
+        if (dy > 0) return 1;      // down
+        if (dx < 0) return 2;      // left
+        return 3;                  // up
+    }
+}
+
+// ============================================================================
+// Helper function to get opposite direction
+// ============================================================================
+int getOppositeDirection(int direction)
+{
+    // 0=right, 1=down, 2=left, 3=up
+    // Opposite of right (0) is left (2)
+    // Opposite of down (1) is up (3)
+    // Opposite of left (2) is right (0)
+    // Opposite of up (3) is down (1)
+    return (direction + 2) % 4;
+}
 
 // ============================================================================
 // Enemy base class
 // ============================================================================
 class Enemy : public GameObject {
-protected:
+private:
     int direction;
+    int desiredDirection;
     QColor color;
     bool frightened;
     QPointF startPosition;
+    int moveCounter;
 
 public:
     Enemy(const QPointF& pos, int size, const QColor& c)
         : GameObject(pos, size)
         , direction(0)
+        , desiredDirection(0)
         , color(c)
         , frightened(false)
         , startPosition(pos)
+        , moveCounter(0)
     {
         speed = 2.0f;
     }
+
+    // Getters and setters
+    int getDirection() const { return direction; }
+    void setDirection(int d) { direction = d; }
+    int getDesiredDirection() const { return desiredDirection; }
+    void setDesiredDirection(int d) { desiredDirection = d; }
+    int getMoveCounter() const { return moveCounter; }
+    void incrementMoveCounter() { moveCounter++; }
+    void resetMoveCounter() { moveCounter = 0; }
+    int getGhostGridX() const { return qRound(position.x() / cellSize); }
+    int getGhostGridY() const { return qRound(position.y() / cellSize); }
 
     virtual ~Enemy() { }
 
@@ -306,9 +421,9 @@ public:
         // Draw eyes
         painter.setBrush(Qt::white);
         int eyeSize = cellSize / 5;
-        painter.drawEllipse(position.x() + cellSize / 3, position.y() + cellSize / 3,
+        painter.drawEllipse(position.x() + cellSize / 3.0, position.y() + cellSize / 3.0,
             eyeSize, eyeSize);
-        painter.drawEllipse(position.x() + 2 * cellSize / 3 - eyeSize, position.y() + cellSize / 3,
+        painter.drawEllipse(position.x() + 2.0 * cellSize / 3.0 - eyeSize, position.y() + cellSize / 3.0,
             eyeSize, eyeSize);
 
         painter.restore();
@@ -330,7 +445,34 @@ public:
         if (gridY < 0 || gridY >= map.size())
             return false;
         QChar cell = map[gridY][gridX];
-        return cell != '#' && cell != '=';
+        return cell != '#';
+    }
+
+    int countAvailableDirections(const QVector<QString>& map)
+    {
+        // Count how many directions are passable from current position
+        // This helps detect intersections (3+ directions available)
+        int currentX = getGridX();
+        int currentY = getGridY();
+        int count = 0;
+
+        // Check all 4 directions
+        // Right
+        if (canMove(currentX + 1, currentY, map)) count++;
+        // Down
+        if (canMove(currentX, currentY + 1, map)) count++;
+        // Left
+        if (canMove(currentX - 1, currentY, map)) count++;
+        // Up
+        if (canMove(currentX, currentY - 1, map)) count++;
+
+        return count;
+    }
+
+    bool isAtIntersection(const QVector<QString>& map)
+    {
+        // An intersection is where 3 or more directions are available
+        return countAvailableDirections(map) >= 3;
     }
 
     void move(const QVector<QString>& map, int)
@@ -339,12 +481,115 @@ public:
         if (!isAtTarget())
             return;
 
+        incrementMoveCounter();
+
         int currentX = getGridX();
         int currentY = getGridY();
         int newX = currentX;
         int newY = currentY;
 
-        switch (direction) {
+        // Only allow direction changes at intersections (3+ available paths)
+        // At non-intersections, continue in current direction
+        bool atIntersection = isAtIntersection(map);
+
+        int directionToUse = getDirection();
+
+        if (atIntersection) {
+            // At an intersection, try to apply the AI's desired direction
+            int desiredDir = getDesiredDirection();
+            int oppositeDir = getOppositeDirection(getDirection());
+            int testX = currentX;
+            int testY = currentY;
+
+            switch (desiredDir) {
+            case 0: testX++; break;
+            case 1: testY++; break;
+            case 2: testX--; break;
+            case 3: testY--; break;
+            }
+
+            // If desired direction is valid and not a turn-around, use it
+            if (canMove(testX, testY, map) && desiredDir != oppositeDir) {
+                directionToUse = desiredDir;
+                setDirection(directionToUse);
+            } else {
+                // Desired direction blocked, try current direction
+                testX = currentX;
+                testY = currentY;
+
+                switch (getDirection()) {
+                case 0: testX++; break;
+                case 1: testY++; break;
+                case 2: testX--; break;
+                case 3: testY--; break;
+                }
+
+                if (canMove(testX, testY, map)) {
+                    directionToUse = getDirection();
+                } else {
+                    // Both blocked, try directions in preference order: up, right, down, left
+                    // Skip the opposite direction to prevent turn-arounds
+                    bool found = false;
+                    int preferredOrder[] = {3, 0, 1, 2};
+                    int oppositeDir = getOppositeDirection(getDirection());
+
+                    for (int i = 0; i < 4; i++) {
+                        int direction = preferredOrder[i];
+                        
+                        // Skip the opposite direction (no turn-arounds)
+                        if (direction == oppositeDir) continue;
+                        
+                        testX = currentX;
+                        testY = currentY;
+
+                        switch (direction) {
+                        case 0: testX++; break;
+                        case 1: testY++; break;
+                        case 2: testX--; break;
+                        case 3: testY--; break;
+                        }
+
+                        if (canMove(testX, testY, map)) {
+                            directionToUse = direction;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        // Fallback: try random directions, but skip opposite direction
+                        for (int attempt = 0; attempt < 10; attempt++) {
+                            int randomDir = QRandomGenerator::global()->bounded(4);
+                            
+                            // Skip the opposite direction
+                            if (randomDir == oppositeDir) continue;
+                            
+                            testX = currentX;
+                            testY = currentY;
+
+                            switch (randomDir) {
+                            case 0: testX++; break;
+                            case 1: testY++; break;
+                            case 2: testX--; break;
+                            case 3: testY--; break;
+                            }
+
+                            if (canMove(testX, testY, map)) {
+                                directionToUse = randomDir;
+                                break;
+                            }
+                        }
+                    }
+                    setDirection(directionToUse);
+                }
+            }
+        }
+
+        // Move in the determined direction
+        newX = currentX;
+        newY = currentY;
+
+        switch (directionToUse) {
         case 0:
             newX++;
             break;
@@ -376,7 +621,61 @@ public:
                 targetPosition.setY(newY * cellSize);
             }
         } else {
-            direction = QRandomGenerator::global()->bounded(4);
+            // Path blocked - try to find any valid direction (shouldn't happen in well-designed maze)
+            bool found = false;
+            int preferredOrder[] = {3, 0, 1, 2};
+            int oppositeDir = getOppositeDirection(getDirection());
+
+            for (int i = 0; i < 4; i++) {
+                int direction = preferredOrder[i];
+                
+                // Skip the opposite direction
+                if (direction == oppositeDir) continue;
+                
+                newX = currentX;
+                newY = currentY;
+
+                switch (direction) {
+                case 0: newX++; break;
+                case 1: newY++; break;
+                case 2: newX--; break;
+                case 3: newY--; break;
+                }
+
+                if (canMove(newX, newY, map)) {
+                    setDirection(direction);
+                    targetPosition.setX(newX * cellSize);
+                    targetPosition.setY(newY * cellSize);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                for (int attempt = 0; attempt < 10; attempt++) {
+                    int randomDir = QRandomGenerator::global()->bounded(4);
+                    
+                    // Skip the opposite direction
+                    if (randomDir == oppositeDir) continue;
+                    
+                    newX = currentX;
+                    newY = currentY;
+
+                    switch (randomDir) {
+                    case 0: newX++; break;
+                    case 1: newY++; break;
+                    case 2: newX--; break;
+                    case 3: newY--; break;
+                    }
+
+                    if (canMove(newX, newY, map)) {
+                        setDirection(randomDir);
+                        targetPosition.setX(newX * cellSize);
+                        targetPosition.setY(newY * cellSize);
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -388,8 +687,9 @@ public:
     {
         position = startPosition;
         targetPosition = startPosition;
-        direction = 0;
-        frightened = false;
+        setDirection(QRandomGenerator::global()->bounded(4));
+        setFrightened(false);
+        resetMoveCounter();
     }
 
     bool collidesWith(const Player& player) const
@@ -402,7 +702,7 @@ public:
 };
 
 // ============================================================================
-// Blinky - chases player directly
+// Blinky - chases player directly (Red ghost)
 // ============================================================================
 class Blinky : public Enemy {
 public:
@@ -413,161 +713,13 @@ public:
 
     void updateDirection(const Player& player, const QVector<QString>&) override
     {
-        if (frightened) {
-            // Run away from player
-            int dx = getGridX() - player.getGridX();
-            int dy = getGridY() - player.getGridY();
-
-            if (abs(dx) > abs(dy)) {
-                direction = (dx > 0) ? 0 : 2;
-            } else {
-                direction = (dy > 0) ? 1 : 3;
-            }
-        } else {
-            // Chase player directly
-            int dx = player.getGridX() - getGridX();
-            int dy = player.getGridY() - getGridY();
-
-            if (abs(dx) > abs(dy)) {
-                direction = (dx > 0) ? 0 : 2;
-            } else {
-                direction = (dy > 0) ? 1 : 3;
-            }
-        }
+        // Move in a random direction
+        int randomDirection = QRandomGenerator::global()->bounded(4);
+        setDesiredDirection(randomDirection);
     }
 };
 
-// ============================================================================
-// Pinky - tries to ambush player ahead
-// ============================================================================
-class Pinky : public Enemy {
-public:
-    Pinky(const QPointF& pos, int size)
-        : Enemy(pos, size, QColor(255, 184, 255))
-    {
-    }
 
-    void updateDirection(const Player& player, const QVector<QString>&) override
-    {
-        if (frightened) {
-            direction = QRandomGenerator::global()->bounded(4);
-        } else {
-            // Target 4 cells ahead of player
-            int targetX = player.getGridX();
-            int targetY = player.getGridY();
-
-            switch (player.getDirection()) {
-            case 0:
-                targetX += 4;
-                break;
-            case 1:
-                targetY += 4;
-                break;
-            case 2:
-                targetX -= 4;
-                break;
-            case 3:
-                targetY -= 4;
-                break;
-            }
-
-            int dx = targetX - getGridX();
-            int dy = targetY - getGridY();
-
-            if (abs(dx) > abs(dy)) {
-                direction = (dx > 0) ? 0 : 2;
-            } else {
-                direction = (dy > 0) ? 1 : 3;
-            }
-        }
-    }
-};
-
-// ============================================================================
-// Inky - uses complex pattern based on Blinky and player
-// ============================================================================
-class Inky : public Enemy {
-private:
-    const Blinky* blinky;
-
-public:
-    Inky(const QPointF& pos, int size, const Blinky* b)
-        : Enemy(pos, size, QColor(0, 255, 255))
-        , blinky(b)
-    {
-    }
-
-    void updateDirection(const Player& player, const QVector<QString>&) override
-    {
-        if (frightened) {
-            direction = QRandomGenerator::global()->bounded(4);
-        } else {
-            // Complex targeting based on Blinky and player
-            int playerX = player.getGridX();
-            int playerY = player.getGridY();
-
-            switch (player.getDirection()) {
-            case 0:
-                playerX += 2;
-                break;
-            case 1:
-                playerY += 2;
-                break;
-            case 2:
-                playerX -= 2;
-                break;
-            case 3:
-                playerY -= 2;
-                break;
-            }
-
-            int targetX = playerX + (playerX - blinky->getGridX());
-            int targetY = playerY + (playerY - blinky->getGridY());
-
-            int dx = targetX - getGridX();
-            int dy = targetY - getGridY();
-
-            if (abs(dx) > abs(dy)) {
-                direction = (dx > 0) ? 0 : 2;
-            } else {
-                direction = (dy > 0) ? 1 : 3;
-            }
-        }
-    }
-};
-
-// ============================================================================
-// Clyde - chases when far, scatters when close
-// ============================================================================
-class Clyde : public Enemy {
-public:
-    Clyde(const QPointF& pos, int size)
-        : Enemy(pos, size, QColor(255, 184, 82))
-    {
-    }
-
-    void updateDirection(const Player& player, const QVector<QString>& map) override
-    {
-        int dx = player.getGridX() - getGridX();
-        int dy = player.getGridY() - getGridY();
-        int distance = dx * dx + dy * dy;
-
-        if (frightened || distance < 64) {
-            // Scatter to corner when close or frightened
-            int targetX = 0;
-            int targetY = map.size() - 1;
-
-            dx = targetX - getGridX();
-            dy = targetY - getGridY();
-        }
-
-        if (abs(dx) > abs(dy)) {
-            direction = (dx > 0) ? 0 : 2;
-        } else {
-            direction = (dy > 0) ? 1 : 3;
-        }
-    }
-};
 
 // ============================================================================
 // GameWidget - Main game widget
@@ -586,8 +738,6 @@ private:
 
     void initMap()
     {
-
-
         map = {
             "############################",
             "#............##............#",
@@ -601,9 +751,9 @@ private:
             "######.#####.##.#####.######",
             "######.#####.##.#####.######",
             "######.##          ##.######",
-            "######.## ###==### ##.######",
+            "######.## ###  ### ##.######",
             "######.## #      # ##.######",
-            "     ...  #      # ...      ",
+            "######... #      # ...######",
             "######.## #      # ##.######",
             "######.## ######## ##.######",
             "######.##          ##.######",
@@ -738,11 +888,6 @@ private:
                         painter.drawLine((x + 1) * cellSize, y * cellSize,
                             (x + 1) * cellSize, (y + 1) * cellSize);
                     }
-                } else if (cell == '=') {
-                    // Draw ghost house gate
-                    painter.setPen(QPen(QColor(255, 184, 255), 3));
-                    painter.drawLine(x * cellSize, y * cellSize + cellSize / 2,
-                        (x + 1) * cellSize, y * cellSize + cellSize / 2);
                 } else if (cell == '.') {
                     painter.setBrush(Qt::white);
                     painter.setPen(Qt::NoPen);
@@ -785,9 +930,7 @@ private:
     void keyPressEvent(QKeyEvent* event) override
     {
         if (gameOver || gameWon) {
-            if (event->key() == Qt::Key_Space) {
-                resetGame();
-            }
+            QApplication::quit();
             return;
         }
 
@@ -836,11 +979,7 @@ public:
 
         player = new Player(QPointF(cellSize, cellSize), cellSize);
 
-        Blinky* blinky = new Blinky(QPointF(13 * cellSize, 11 * cellSize), cellSize);
-        enemies.push_back(blinky);
-        enemies.push_back(new Pinky(QPointF(11 * cellSize, 11 * cellSize), cellSize));
-        enemies.push_back(new Inky(QPointF(13 * cellSize, 13 * cellSize), cellSize, blinky));
-        enemies.push_back(new Clyde(QPointF(15 * cellSize, 11 * cellSize), cellSize));
+        enemies.push_back(new Blinky(QPointF(13 * cellSize, 11 * cellSize), cellSize));
 
         gameTimer = new QTimer(this);
         connect(gameTimer, &QTimer::timeout, this, &GameWidget::gameLoop);
